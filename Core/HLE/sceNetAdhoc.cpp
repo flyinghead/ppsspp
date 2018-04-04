@@ -878,7 +878,7 @@ static int sceNetAdhocctlScan() {
 			uint8_t opcode = OPCODE_SCAN;
 
 			// Send Scan Request Packet, may failed with socket error 10054/10053 if someone else with the same IP already connected to AdHoc Server (the server might need to be modified to differentiate MAC instead of IP)
-			int iResult = send(metasocket, (char *)&opcode, 1, 0);
+			int iResult = send(metasocket, (char *)&opcode, 1, SEND_FLAGS);
 			if (iResult == SOCKET_ERROR) {
 				int error = errno;
 				ERROR_LOG(SCENET, "Socket error (%i) when sending", error);
@@ -1068,7 +1068,7 @@ static u32 sceNetAdhocctlDisconnect() {
 			//_acquireNetworkLock();
 
 			// Send Disconnect Request Packet
-			int iResult = send(metasocket, (const char *)&opcode, 1, 0);
+			int iResult = send(metasocket, (const char *)&opcode, 1, SEND_FLAGS);
 			if (iResult == SOCKET_ERROR) {
 				ERROR_LOG(SCENET, "Socket error (%i) when sending", errno);
 			}
@@ -1341,7 +1341,7 @@ int sceNetAdhocctlCreate(const char *groupName) {
 				// Acquire Network Lock
 
 				// Send Packet
-				int iResult = send(metasocket, (const char *)&packet, sizeof(packet), 0);
+				int iResult = send(metasocket, (const char *)&packet, sizeof(packet), SEND_FLAGS);
 				if (iResult == SOCKET_ERROR) {
 					ERROR_LOG(SCENET, "Socket error (%i) when sending", errno);
 					//return ERROR_NET_ADHOCCTL_NOT_INITIALIZED; // ERROR_NET_ADHOCCTL_DISCONNECTED; // ERROR_NET_ADHOCCTL_BUSY;

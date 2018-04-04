@@ -1019,7 +1019,7 @@ int friendFinder(){
 			uint8_t opcode = OPCODE_PING;
 
 			// Send Ping to Server, may failed with socket error 10054/10053 if someone else with the same IP already connected to AdHoc Server (the server might need to be modified to differentiate MAC instead of IP)
-			int iResult = send(metasocket, (const char *)&opcode, 1, 0);
+			int iResult = send(metasocket, (const char *)&opcode, 1, SEND_FLAGS);
 			/*if (iResult == SOCKET_ERROR) {
 			ERROR_LOG(SCENET, "FriendFinder: Socket Error (%i) when sending OPCODE_PING", errno);
 			//friendFinderRunning = false;
@@ -1564,7 +1564,7 @@ int initNetwork(SceNetAdhocctlAdhocId *adhoc_id){
 	packet.mac = addres;
 	strcpy((char *)packet.name.data, g_Config.sNickName.c_str());
 	memcpy(packet.game.data, adhoc_id->data, ADHOCCTL_ADHOCID_LEN);
-	int sent = send(metasocket, (char*)&packet, sizeof(packet), 0);
+	int sent = send(metasocket, (char*)&packet, sizeof(packet), SEND_FLAGS);
 	changeBlockingMode(metasocket, 1); // Change to non-blocking
 	if (sent > 0) {
 		I18NCategory *n = GetI18NCategory("Networking");

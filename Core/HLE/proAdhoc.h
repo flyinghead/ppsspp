@@ -96,6 +96,12 @@ inline bool connectInProgress(int errcode){ return (errcode == EINPROGRESS || er
 #define POLLPRI POLL_PRI
 #endif
 
+#ifdef MSG_NOSIGNAL
+#define SEND_FLAGS MSG_NOSIGNAL
+#else
+#define SEND_FLAGS 0
+#endif
+
 #define IsMatch(buf1, buf2)	(memcmp(&buf1, &buf2, sizeof(buf1)) == 0)
 
 // Server Listening Port
