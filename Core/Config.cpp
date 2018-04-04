@@ -712,6 +712,7 @@ static ConfigSetting controlSettings[] = {
 static ConfigSetting networkSettings[] = {
 	ConfigSetting("EnableWlan", &g_Config.bEnableWlan, false, true, true),
 	ConfigSetting("EnableAdhocServer", &g_Config.bEnableAdhocServer, false, true, true),
+	ConfigSetting("AutoAdhocServer", &g_Config.bAutoAdhocServer, true, true, true),
 
 	ConfigSetting(false),
 };

@@ -22,6 +22,8 @@
 // All credit goes to him!
 
 #include <cstring>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include "util/text/parsers.h"
 #include "Core/Core.h"
 #include "Core/Host.h"
@@ -1408,37 +1410,145 @@ int initNetwork(SceNetAdhocctlAdhocId *adhoc_id){
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(SERVER_PORT); //27312 // Maybe read this from config too
 
-	// Resolve dns
-	addrinfo * resultAddr;
-	addrinfo * ptr;
-	in_addr serverIp;
-	serverIp.s_addr = INADDR_NONE;
+    in_addr serverIp;
+    serverIp.s_addr = INADDR_NONE;
+    
+    std::string proAdhocServerName = g_Config.proAdhocServer;
 
-	iResult = getaddrinfo(g_Config.proAdhocServer.c_str(),0,NULL,&resultAddr);
-	if (iResult != 0) {
-		ERROR_LOG(SCENET, "DNS Error (%s)\n", g_Config.proAdhocServer.c_str());
-		host->NotifyUserMessage("DNS Error connecting to " + g_Config.proAdhocServer, 8.0f);
-		return iResult;
-	}
-	for (ptr = resultAddr; ptr != NULL; ptr = ptr->ai_next) {
-		switch (ptr->ai_family) {
-		case AF_INET:
-			serverIp = ((sockaddr_in *)ptr->ai_addr)->sin_addr;
-			break;
-		}
-	}
+    if (g_Config.bEnableAdhocServer) {
+        // If built-in proAdhoc server is enabled, connect to it
+        // Note: this is not really needed if using the broadcast below
+        struct ifaddrs *ifAddrStruct;
+        
+        iResult = getifaddrs(&ifAddrStruct);
+        if (iResult != 0) {
+            ERROR_LOG(SCENET, "Network Error: Can't find local IP address. errno=%d\n", errno);
+            host->NotifyUserMessage("Network Error: Can't find local IP address", 8.0f);
+            return iResult;
+        }
+
+        for (struct ifaddrs *ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
+            if (!ifa->ifa_addr || ifa->ifa_flags & IFF_LOOPBACK || !(ifa->ifa_flags & IFF_UP))
+                continue;
+            if (ifa->ifa_addr->sa_family == AF_INET) { // check it is IP4
+                // is a valid IP4 Address
+                in_addr *tmpAddrPtr = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
+                char addressBuffer[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
+                proAdhocServerName = addressBuffer;
+                serverIp = *tmpAddrPtr;
+            }
+        }
+        freeifaddrs(ifAddrStruct);
+        if (serverIp.s_addr == INADDR_NONE) {
+            ERROR_LOG(SCENET, "Network Error: Can't find local IP address. No network?\n");
+            host->NotifyUserMessage("Network Error: No network found", 8.0f);
+            return -1;
+        }
+    }
+    else if (g_Config.bAutoAdhocServer) {
+        // Automatically find the adhoc server on the local network using broadcast
+        int sockfd;
+        if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+            ERROR_LOG(SCENET, "Datagram socket creation error. errno=%d", errno);
+            return -1;
+        }
+        
+        // Allow broadcast packets to be sent
+        int broadcast = 1;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) == -1) {
+            ERROR_LOG(SCENET, "setsockopt(SO_BROADCAST) failed. errno=%d", errno);
+            close(sockfd);
+            return -1;
+        }
+        
+        // Set a 1 sec timeout on recv call
+        struct timeval tv;
+        tv.tv_sec = 1;
+        tv.tv_usec = 0;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == -1) {
+            ERROR_LOG(SCENET, "setsockopt(SO_RCVTIMEO) failed. errno=%d", errno);
+            close(sockfd);
+            return -1;
+        }
+        
+        struct sockaddr_in addr;
+        addr.sin_family = AF_INET;          // host byte order
+        addr.sin_port = htons(SERVER_PORT); // short, network byte order
+        addr.sin_addr.s_addr = INADDR_BROADCAST;
+        memset(addr.sin_zero, '\0', sizeof(addr.sin_zero));
+        
+        struct sockaddr server_addr;
+     
+        for (int i = 0; i < 3; i++) {
+            if (sendto(sockfd, "ppsspp", 6, 0,
+                                 (struct sockaddr *)&addr, sizeof addr) == -1) {
+                WARN_LOG(SCENET, "Send datagram failed. errno=%d", errno);
+                sleep_ms(100);
+                continue;
+            }
+            
+            char buf[6];
+            memset(&server_addr, '\0', sizeof(server_addr));
+            socklen_t addrlen = sizeof(server_addr);
+            if (recvfrom(sockfd, buf, sizeof(buf), 0, &server_addr, &addrlen) == -1) {
+                if (errno != EAGAIN)
+                    WARN_LOG(SCENET, "Recv datagram failed. errno=%d", errno);
+                else
+                    INFO_LOG(SCENET, "Recv datagram timeout. i=%d", i);
+                continue;
+            }
+            serverIp = ((struct sockaddr_in *)&server_addr)->sin_addr;
+            char addressBuffer[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &serverIp, addressBuffer, INET_ADDRSTRLEN);
+            proAdhocServerName = addressBuffer;
+            break;
+        }
+        close(sockfd);
+        if (serverIp.s_addr == INADDR_NONE) {
+            ERROR_LOG(SCENET, "Network Error: Can't find PRO ad hoc server on local network\n");
+            host->NotifyUserMessage("No PRO ad hoc server found", 8.0f);
+            return -1;
+        }
+        INFO_LOG(SCENET, "Found PRO ad hoc server at %s", proAdhocServerName.c_str());
+    }
+    else
+    {
+        // Resolve dns
+        addrinfo * resultAddr;
+        addrinfo * ptr;
+
+        iResult = getaddrinfo(proAdhocServerName.c_str(),0,NULL,&resultAddr);
+        if (iResult != 0) {
+            ERROR_LOG(SCENET, "DNS Error (%s)\n", proAdhocServerName.c_str());
+            host->NotifyUserMessage("DNS Error connecting to " + proAdhocServerName, 8.0f);
+            return iResult;
+        }
+        for (ptr = resultAddr; ptr != NULL; ptr = ptr->ai_next) {
+            switch (ptr->ai_family) {
+            case AF_INET:
+                serverIp = ((sockaddr_in *)ptr->ai_addr)->sin_addr;
+                break;
+            }
+        }
+    }
 	
 	memset(&parameter, 0, sizeof(parameter));
 	strcpy((char *)&parameter.nickname.data, g_Config.sNickName.c_str());
 	parameter.channel = 1; // Fake Channel 1
 	getLocalMac(&parameter.bssid.mac_addr);
 
+#if defined(__APPLE__)      // OSX, iOS
+    int option_value = 1; /* Set NOSIGPIPE to ON */
+    setsockopt(metasocket, SOL_SOCKET, SO_NOSIGPIPE, &option_value, sizeof(option_value));
+#endif
+    
 	server_addr.sin_addr = serverIp;
 	iResult = connect(metasocket,(sockaddr *)&server_addr,sizeof(server_addr));
 	if (iResult == SOCKET_ERROR) {
 		uint8_t * sip = (uint8_t *)&server_addr.sin_addr.s_addr;
 		char buffer[512];
-		snprintf(buffer, sizeof(buffer), "Socket error (%i) when connecting to %s/%u.%u.%u.%u:%u", errno, g_Config.proAdhocServer.c_str(), sip[0], sip[1], sip[2], sip[3], ntohs(server_addr.sin_port));
+		snprintf(buffer, sizeof(buffer), "Socket error (%i) when connecting to %s/%u.%u.%u.%u:%u", errno, proAdhocServerName.c_str(), sip[0], sip[1], sip[2], sip[3], ntohs(server_addr.sin_port));
 		ERROR_LOG(SCENET, "%s", buffer);
 		host->NotifyUserMessage(buffer, 8.0f);
 		return iResult;

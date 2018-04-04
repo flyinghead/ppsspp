@@ -615,14 +615,38 @@ void GameSettingsScreen::CreateViews() {
 
 	networkingSettings->Add(new CheckBox(&g_Config.bEnableWlan, n->T("Enable networking", "Enable networking/wlan (beta)")));
 
+	CheckBox *autoFindCheckBox = networkingSettings->Add(new CheckBox(&g_Config.bAutoAdhocServer, "Automatically find local server"));
+
+	Choice *serverChoice =
 #if !defined(MOBILE_DEVICE) && !defined(USING_QT_UI)
-	networkingSettings->Add(new PopupTextInputChoice(&g_Config.proAdhocServer, n->T("Change proAdhocServer Address"), "", 255, screenManager()));
+		networkingSettings->Add(new PopupTextInputChoice(&g_Config.proAdhocServer, n->T("Change proAdhocServer Address"), "", 255, screenManager()));
 #elif defined(__ANDROID__)
-	networkingSettings->Add(new ChoiceWithValueDisplay(&g_Config.proAdhocServer, n->T("Change proAdhocServer Address"), nullptr))->OnClick.Handle(this, &GameSettingsScreen::OnChangeproAdhocServerAddress);
+		networkingSettings->Add(new ChoiceWithValueDisplay(&g_Config.proAdhocServer, n->T("Change proAdhocServer Address"), nullptr));
+		serverChoice->OnClick.Handle(this, &GameSettingsScreen::OnChangeproAdhocServerAddress);
 #else
-	networkingSettings->Add(new ChoiceWithValueDisplay(&g_Config.proAdhocServer, n->T("Change proAdhocServer Address"), nullptr))->OnClick.Handle(this, &GameSettingsScreen::OnChangeproAdhocServerAddress);
+		networkingSettings->Add(new ChoiceWithValueDisplay(&g_Config.proAdhocServer, n->T("Change proAdhocServer Address"), nullptr));
+		serverChoice->OnClick.Handle(this, &GameSettingsScreen::OnChangeproAdhocServerAddress);
 #endif
-	networkingSettings->Add(new CheckBox(&g_Config.bEnableAdhocServer, n->T("Enable built-in PRO Adhoc Server", "Enable built-in PRO Adhoc Server")));
+	CheckBox *builtinAdhoc = networkingSettings->Add(new CheckBox(&g_Config.bEnableAdhocServer, n->T("Enable built-in PRO Adhoc Server", "Enable built-in PRO Adhoc Server")));
+
+	autoFindCheckBox->OnClick.Add([=](EventParams &e) {
+		serverChoice->SetEnabled(!g_Config.bEnableAdhocServer && !g_Config.bAutoAdhocServer);
+		return UI::EVENT_CONTINUE;
+	});
+
+	builtinAdhoc->OnClick.Add([=](EventParams &e) {
+        	serverChoice->SetEnabled(!g_Config.bEnableAdhocServer && !g_Config.bAutoAdhocServer);
+        	if (g_Config.bEnableAdhocServer && !g_Config.bAutoAdhocServer)
+        		autoFindCheckBox->Toggle();
+        	autoFindCheckBox->SetEnabled(!g_Config.bEnableAdhocServer);
+        	return UI::EVENT_CONTINUE;
+    	});
+
+	serverChoice->SetEnabled(!g_Config.bEnableAdhocServer && !g_Config.bAutoAdhocServer);
+	if (g_Config.bEnableAdhocServer && !g_Config.bAutoAdhocServer)
+        	autoFindCheckBox->Toggle();
+	autoFindCheckBox->SetEnabled(!g_Config.bEnableAdhocServer);
+
 	networkingSettings->Add(new ChoiceWithValueDisplay(&g_Config.sMACAddress, n->T("Change Mac Address"), nullptr))->OnClick.Handle(this, &GameSettingsScreen::OnChangeMacAddress);
 	networkingSettings->Add(new PopupSliderChoice(&g_Config.iPortOffset, 0, 60000, n->T("Port offset", "Port offset(0 = PSP compatibility)"), 100, screenManager()));
 

@@ -474,7 +474,8 @@ void interrupt(int sig);
 void enable_address_reuse(int fd);
 void change_blocking_mode(int fd, int nonblocking);
 int create_listen_socket(uint16_t port);
-int server_loop(int server);
+int create_beacon_socket(uint16_t port);
+int server_loop(int server, int beaconServer);
 
 void __AdhocServerInit() {
 	// Database Product name will update if new game region played on my server to list possible crosslinks
@@ -1677,18 +1678,28 @@ int proAdhocServerThread(int port) // (int argc, char * argv[])
 	// Create Listening Socket
 	int server = create_listen_socket(port); //SERVER_PORT
 
+    // Create Beacon Socket
+    int beaconServer = create_beacon_socket(port);
+    
 	// Created Listening Socket
-	if(server != -1)
+	if(server != -1 && beaconServer != -1)
 	{
 		// Notify User
 		INFO_LOG(SCENET, "AdhocServer: Listening for Connections on TCP Port %u", port); //SERVER_PORT
 
 		// Enter Server Loop
-		result = server_loop(server);
+		result = server_loop(server, beaconServer);
 
 		// Notify User
 		INFO_LOG(SCENET, "AdhocServer: Shutdown complete");
 	}
+    else
+    {
+        if (server != -1)
+            closesocket(server);
+        if (beaconServer != -1)
+            closesocket(beaconServer);
+    }
 
 	//_status = 0;
 	adhocServerRunning = false;
@@ -1813,12 +1824,56 @@ int create_listen_socket(uint16_t port)
 	return -1;
 }
 
+int create_beacon_socket(uint16_t port) {
+    // Create Socket
+    int fd = (int)socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    
+    // Created Socket
+    if(fd != -1)
+    {
+        // Enable Address Reuse
+        enable_address_reuse(fd);
+        
+        // Make Socket Nonblocking
+        change_blocking_mode(fd, 1);
+        
+        // Prepare Local Address Information
+        struct sockaddr_in local;
+        memset(&local, 0, sizeof(local));
+        local.sin_family = AF_INET;
+        local.sin_addr.s_addr = INADDR_ANY;
+        local.sin_port = htons(port);
+        
+        // Bind Local Address to Socket
+        int bindresult = bind(fd, (struct sockaddr *)&local, sizeof(local));
+        
+        // Bound Local Address to Socket
+        if(bindresult != -1)
+        {
+            // Return Socket
+            return fd;
+        }
+        
+        // Notify User
+        else ERROR_LOG(SCENET, "AdhocServer: Bind returned %i (Socket error %d)", bindresult, errno);
+        
+        // Close Socket
+        closesocket(fd);
+    }
+    
+    // Notify User
+    else ERROR_LOG(SCENET, "AdhocServer: Socket returned %i (Socket error %d)", fd, errno);
+    
+    // Return Error
+    return -1;
+}
+
 /**
  * Server Main Loop
  * @param server Server Listening Socket
  * @return OS Error Code
  */
-int server_loop(int server)
+int server_loop(int server, int beaconServer)
 {
 	// Set Running Status
 	//_status = 1;
@@ -1869,6 +1924,30 @@ int server_loop(int server)
 				}
 			} while(loginresult != -1);
 		}
+        
+        // Receive broadcast queries on beacon socket and reply
+        {
+            struct sockaddr_in addr;
+            socklen_t addrlen = sizeof(addr);
+            memset(&addr, 0, sizeof(addr));
+            char buf[6];
+            size_t n;
+            do {
+                memset(buf, '\0', sizeof(buf));
+                if ((n = recvfrom(beaconServer, buf, sizeof(buf), 0,
+                                     (struct sockaddr *)&addr, &addrlen)) == -1) {
+                    if (errno != EAGAIN)
+                        WARN_LOG(SCENET, "AdhocServer: Error receiving datagram. errno=%d", errno);
+                }
+                else
+                {
+                    INFO_LOG(SCENET, "AdhocServer: beacon received %ld bytes", n);
+                    if (n == sizeof(buf) && !strncmp(buf, "ppsspp", n)) {
+                        sendto(beaconServer, buf, n, 0, (const struct sockaddr *)&addr, addrlen);
+                    }
+                }
+            } while (n != -1);
+        }
 
 		// Receive Data from Users
 		SceNetAdhocctlUserNode * user = _db_user;
@@ -2031,8 +2110,9 @@ int server_loop(int server)
 	// Free User Database Memory
 	free_database();
 
-	// Close Server Socket
+	// Close Server Sockets
 	closesocket(server);
+    closesocket(beaconServer);
 
 	// Return Success
 	return 0;
