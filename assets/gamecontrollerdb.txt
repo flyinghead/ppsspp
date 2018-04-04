@@ -185,3 +185,7 @@ bd1200000000000015d0000000000000,Tomee SNES USB Controller,x:b3,a:b2,b:b1,y:b0,b
 03000000c82d00000190000011010000,8Bitdo NES30 Pro   8Bitdo NES30 Pro,platform:Linux,a:b1,b:b0,x:b4,y:b3,back:b10,start:b11,leftstick:b13,rightstick:b14,leftshoulder:b6,rightshoulder:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:a4,righttrigger:a5,
 05000000c82d00002038000000010000,8Bitdo NES30 Pro,platform:Linux,a:b1,b:b0,x:b4,y:b3,back:b10,guide:b2,start:b11,leftstick:b13,rightstick:b14,leftshoulder:b6,rightshoulder:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:a5,righttrigger:a4,
 030000005e040000a102000000010000,Xbox 360 Wireless Receiver,b:b1,righty:a3,rightx:a2,a:b0,x:b2,righttrigger:b7,rightstick:b12,leftshoulder:b4,dpup:b15,start:b9,dpdown:b16,rightshoulder:b5,dpright:b14,lefttrigger:b6,leftstick:b11,guide:b8,y:b3,lefty:a1,leftx:a0,back:b8,dpleft:b13,platform:Linux,
+
+# Custom
+030000004f1b00000692000001010000,SparkFun SparkFun Pro Micro,x:b3,a:b2,b:b4,y:b5,back:b0,guide:b12,start:b1,dpleft:b10,dpdown:b9,dpright:b11,dpup:b8,leftshoulder:b7,rightshoulder:b6,leftx:a0,lefty:a1,lefttrigger:b13,righttrigger:b14,rightstick:b15,leftstick:b16,platform:Linux,
+03000000412300003e00000001010000,Arduino LLC Arduino Due,x:b3,a:b2,b:b4,y:b5,back:b0,guide:b12,start:b1,dpleft:b10,dpdown:b9,dpright:b11,dpup:b8,leftshoulder:b7,rightshoulder:b6,leftx:a0,lefty:a1,lefttrigger:b13,righttrigger:b14,rightstick:b15,leftstick:b16,platform:Linux,
