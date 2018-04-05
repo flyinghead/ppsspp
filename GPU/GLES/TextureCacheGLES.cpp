@@ -924,7 +924,12 @@ void TextureCacheGLES::LoadTextureLevel(TexCacheEntry &entry, ReplacedTexture &r
 		if (!lowMemoryMode_) {
 			// TODO: We really, really should avoid calling glGetError.
 			GLenum err = glGetError();
-			if (err == GL_OUT_OF_MEMORY) {
+			if (err == GL_OUT_OF_MEMORY
+#ifdef PPSSPP_PLATFORM_RPI
+			    // The Pi GPU seems to report some out of memory errors with this code instead
+			    || err == GL_INVALID_OPERATION
+#endif
+					) {
 				WARN_LOG_REPORT(G3D, "Texture cache ran out of GPU memory; switching to low memory mode");
 				lowMemoryMode_ = true;
 				decimationCounter_ = 0;
