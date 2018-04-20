@@ -699,8 +699,6 @@ int main(int argc, char *argv[]) {
 	while (true) {
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
-			float mx = event.motion.x * g_dpi_scale_x;
-			float my = event.motion.y * g_dpi_scale_y;
 
 			switch (event.type) {
 			case SDL_QUIT:
@@ -783,6 +781,8 @@ int main(int argc, char *argv[]) {
 				switch (event.button.button) {
 				case SDL_BUTTON_LEFT:
 					{
+						float mx = event.button.x * g_dpi_scale_x;
+						float my = event.button.y * g_dpi_scale_y;
 						mouseDown = true;
 						TouchInput input;
 						input.x = mx;
@@ -822,6 +822,8 @@ int main(int argc, char *argv[]) {
 				}
 			case SDL_MOUSEMOTION:
 				if (mouseDown) {
+					float mx = event.motion.x * g_dpi_scale_x;
+					float my = event.motion.y * g_dpi_scale_y;
 					TouchInput input;
 					input.x = mx;
 					input.y = my;
@@ -834,6 +836,8 @@ int main(int argc, char *argv[]) {
 				switch (event.button.button) {
 				case SDL_BUTTON_LEFT:
 					{
+						float mx = event.button.x * g_dpi_scale_x;
+						float my = event.button.y * g_dpi_scale_y;
 						mouseDown = false;
 						TouchInput input;
 						input.x = mx;
@@ -853,6 +857,46 @@ int main(int argc, char *argv[]) {
 					break;
 				}
 				break;
+
+			case SDL_FINGERDOWN:
+				{
+					mouseDown = true;
+					TouchInput input;
+					input.x = event.tfinger.x * pixel_xres * g_dpi_scale_x;
+					input.y = event.tfinger.y * pixel_yres * g_dpi_scale_y;
+					input.flags = TOUCH_DOWN | TOUCH_MOUSE;
+					input.id = 0;
+					NativeTouch(input);
+					KeyInput key(DEVICE_ID_MOUSE, NKCODE_EXT_MOUSEBUTTON_1, KEY_DOWN);
+					NativeKey(key);
+				}
+				break;
+
+			case SDL_FINGERMOTION:
+				if (mouseDown) {
+					TouchInput input;
+					input.x = event.tfinger.x * pixel_xres * g_dpi_scale_x;
+					input.y = event.tfinger.y * pixel_yres * g_dpi_scale_y;
+					input.flags = TOUCH_MOVE | TOUCH_MOUSE;
+					input.id = 0;
+					NativeTouch(input);
+				}
+				break;
+
+			case SDL_FINGERUP:
+				{
+					mouseDown = false;
+					TouchInput input;
+					input.x = event.tfinger.x * pixel_xres * g_dpi_scale_x;
+					input.y = event.tfinger.y * pixel_yres * g_dpi_scale_y;
+					input.flags = TOUCH_UP | TOUCH_MOUSE;
+					input.id = 0;
+					NativeTouch(input);
+					KeyInput key(DEVICE_ID_MOUSE, NKCODE_EXT_MOUSEBUTTON_1, KEY_UP);
+					NativeKey(key);
+				}
+				break;
+
 			default:
 #ifndef _WIN32
 				if (joystick) {
