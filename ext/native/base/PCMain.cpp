@@ -414,6 +414,25 @@ void ToggleFullScreenIfFlagSet() {
 	}
 }
 
+#define MAX_TOUCHES 10      // Should be the same as GestureDetector::MAX_PTRS
+
+int findTouchedFinger(SDL_FingerID fingerId, SDL_FingerID touches[]) {
+	int freeSlot = -1;
+	for (int i = 0; i < MAX_TOUCHES; i++) {
+		if (touches[i] == fingerId)
+			return i;
+		if (touches[i] == -1)
+			freeSlot = i;
+	}
+	// Not found but space available
+	if (freeSlot != -1) {
+		touches[freeSlot] = fingerId;
+		return freeSlot;
+	}
+	// Not found and all slots in use
+	return -1;
+}
+
 #ifdef _WIN32
 #undef main
 #endif
@@ -695,6 +714,10 @@ int main(int argc, char *argv[]) {
 	float t = 0;
 	float lastT = 0;
 	bool mouseDown = false;
+	SDL_FingerID touchedFingers[MAX_TOUCHES];
+
+	for (int i = 0; i < MAX_TOUCHES; i++)
+		touchedFingers[i] = -1;
 
 	while (true) {
 		SDL_Event event;
@@ -820,6 +843,7 @@ int main(int argc, char *argv[]) {
 					key.flags = KEY_UP;
 					NativeKey(key);
 				}
+				break;
 			case SDL_MOUSEMOTION:
 				if (mouseDown) {
 					float mx = event.motion.x * g_dpi_scale_x;
@@ -860,38 +884,48 @@ int main(int argc, char *argv[]) {
 
 			case SDL_FINGERDOWN:
 				{
-					mouseDown = true;
-					TouchInput input;
-					input.x = event.tfinger.x * pixel_xres * g_dpi_scale_x;
-					input.y = event.tfinger.y * pixel_yres * g_dpi_scale_y;
-					input.flags = TOUCH_DOWN | TOUCH_MOUSE;
-					input.id = 0;
-					NativeTouch(input);
+					int fingerIdx = findTouchedFinger(event.tfinger.fingerId, touchedFingers);
+					if (fingerIdx >= 0)
+					{
+						TouchInput input;
+						input.x = event.tfinger.x * pixel_xres * g_dpi_scale_x;
+						input.y = event.tfinger.y * pixel_yres * g_dpi_scale_y;
+						input.flags = TOUCH_DOWN;
+						input.id = fingerIdx;
+						NativeTouch(input);
+					}
 					KeyInput key(DEVICE_ID_MOUSE, NKCODE_EXT_MOUSEBUTTON_1, KEY_DOWN);
 					NativeKey(key);
 				}
 				break;
 
 			case SDL_FINGERMOTION:
-				if (mouseDown) {
-					TouchInput input;
-					input.x = event.tfinger.x * pixel_xres * g_dpi_scale_x;
-					input.y = event.tfinger.y * pixel_yres * g_dpi_scale_y;
-					input.flags = TOUCH_MOVE | TOUCH_MOUSE;
-					input.id = 0;
-					NativeTouch(input);
+				{
+					int fingerIdx = findTouchedFinger(event.tfinger.fingerId, touchedFingers);
+					if (fingerIdx >= 0)
+					{
+						TouchInput input;
+						input.x = event.tfinger.x * pixel_xres * g_dpi_scale_x;
+						input.y = event.tfinger.y * pixel_yres * g_dpi_scale_y;
+						input.flags = TOUCH_MOVE;
+						input.id = fingerIdx;
+						NativeTouch(input);
+					}
 				}
 				break;
 
 			case SDL_FINGERUP:
 				{
-					mouseDown = false;
-					TouchInput input;
-					input.x = event.tfinger.x * pixel_xres * g_dpi_scale_x;
-					input.y = event.tfinger.y * pixel_yres * g_dpi_scale_y;
-					input.flags = TOUCH_UP | TOUCH_MOUSE;
-					input.id = 0;
-					NativeTouch(input);
+					int fingerIdx = findTouchedFinger(event.tfinger.fingerId, touchedFingers);
+					if (fingerIdx >= 0) {
+						TouchInput input;
+						input.x = event.tfinger.x * pixel_xres * g_dpi_scale_x;
+						input.y = event.tfinger.y * pixel_yres * g_dpi_scale_y;
+						input.flags = TOUCH_UP;
+						input.id = fingerIdx;
+						NativeTouch(input);
+						touchedFingers[fingerIdx] = -1;
+					}
 					KeyInput key(DEVICE_ID_MOUSE, NKCODE_EXT_MOUSEBUTTON_1, KEY_UP);
 					NativeKey(key);
 				}
